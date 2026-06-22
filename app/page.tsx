@@ -36,6 +36,7 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [picker, setPicker] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [now, setNow] = useState(0); // client-seeded clock (avoids SSR hydration drift; ticks live)
 
   // create-course modal
   const [createOpen, setCreateOpen] = useState(false);
@@ -60,6 +61,7 @@ export default function Home() {
     } catch { /* keep last good */ }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setNow(Math.floor(Date.now() / 1000)); const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000); return () => clearInterval(t); }, []);
 
   async function refreshSel(id: number) { const fresh = await fetchCourse(id); if (fresh) setSel(fresh); }
 
@@ -100,11 +102,11 @@ export default function Home() {
     if (!t) return flash("✗ name the course");
     if (!Number.isInteger(n) || n < 2 || n > 60) return flash("✗ lessons 2–60");
     const ok = await run("create", (c) => c.createCourse(t, n, cDur), "✓ course is live");
-    if (ok) { setCreateOpen(false); setCTitle(""); }
+    if (ok) { setCreateOpen(false); setCTitle(""); try { const fresh = await fetchFeed(1, readContract()); if (fresh[0]) setSel(fresh[0]); } catch { /* keep */ } }
   }
 
   // ── derived for the selected course ──
-  const ended = sel ? courseEnded(sel) : false;
+  const ended = sel ? courseEnded(sel, now) : false;
   const settled = sel ? fullySettled(sel) : false;
   const isTutor = !!(sel && account && sel.tutor.toLowerCase() === account.toLowerCase());
   const mine = sel && account ? sel.stakers.find((s) => s.student.toLowerCase() === account.toLowerCase()) : undefined;
@@ -113,7 +115,7 @@ export default function Home() {
     ? (sel.forfeitPool * mine.stake) / sel.finisherWeight : 0n;
   const unsettled = sel ? sel.stakers.filter((s) => s.status === 1).map((s) => s.student) : [];
   const slice = sel && sel.lessons ? (ethers.parseEther(chip) / BigInt(sel.lessons)) : 0n;
-  const poolRot = sel && stats.staked > 0n ? Math.min(270, Number((sel.forfeitPool * 270n) / (sel.forfeitPool + sel.finisherWeight + 1n))) : 0;
+  const poolRot = sel ? (() => { const ts = sel.stakers.reduce((a, s) => a + s.stake, 0n); return ts > 0n ? Math.min(270, Number((sel.forfeitPool * 270n) / ts)) : 0; })() : 0;
 
   return (
     <div className="console">
@@ -128,17 +130,20 @@ export default function Home() {
         <span className="led">ARC SYNC [LIVE]</span>
         <span className="led" style={{ color: "#19e59b" }}>GAS: USDC</span>
         <div style={{ flex: 1 }} />
-        <button className="led" onClick={() => setPicker((p) => !p)} style={{ background: "none", border: "1px solid var(--line)", padding: "5px 10px", position: "relative" }}>
-          PRESET: {sel ? `${sel.id < 10 ? "0" + sel.id : sel.id}_${sel.title.toUpperCase().replace(/\s+/g, "_").slice(0, 16)}` : "—"} ▾
-          {picker && (
-            <span onMouseLeave={() => setPicker(false)} style={{ position: "absolute", top: "100%", right: 0, zIndex: 80, minWidth: 240, background: "var(--panel)", border: "1px solid var(--line-2)", marginTop: 4, maxHeight: 320, overflow: "auto" }}>
+        <div style={{ position: "relative" }}>
+          <button className="led" onClick={() => setPicker((p) => !p)} style={{ background: "none", border: "1px solid var(--line)", padding: "5px 10px", color: "var(--paper)" }}>
+            PRESET: {sel ? `${sel.id < 10 ? "0" + sel.id : sel.id}_${sel.title.toUpperCase().replace(/\s+/g, "_").slice(0, 16)}` : "—"} ▾
+          </button>
+          {picker && (<>
+            <div onClick={() => setPicker(false)} style={{ position: "fixed", inset: 0, zIndex: 79 }} />
+            <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 81, minWidth: 240, maxWidth: "calc(100vw - 36px)", background: "var(--panel)", border: "1px solid var(--line-2)", marginTop: 4, maxHeight: 320, overflow: "auto" }}>
               {feed.length === 0 && <span className="menu-item" style={{ color: "var(--mute)" }}>no courses yet</span>}
               {feed.map((c) => (
-                <span key={c.id} className="menu-item" onClick={(e) => { e.stopPropagation(); setSel(c); setPicker(false); }}>{c.id < 10 ? "0" + c.id : c.id} · {c.title}</span>
+                <button key={c.id} className="menu-item" onClick={() => { setSel(c); setPicker(false); }}>{c.id < 10 ? "0" + c.id : c.id} · {c.title}</button>
               ))}
-            </span>
-          )}
-        </button>
+            </div>
+          </>)}
+        </div>
         <button onClick={() => setCreateOpen(true)} className="btn btn--signal btn--sm">+ new course</button>
         {account ? (
           <div style={{ position: "relative" }}>
@@ -158,7 +163,18 @@ export default function Home() {
         )}
       </div>
 
-      {!hasContract() && <div style={{ padding: "10px 18px", background: "#2a0e0c", color: "#ff8a7e", fontSize: 12 }}>contract not deployed — deploy at <a href="/deploy" style={{ textDecoration: "underline" }}>/deploy</a></div>}
+      {/* role-aware guide rail — one obvious next step for every role */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "9px 18px", borderBottom: "1px solid var(--line)", background: "var(--panel)", fontSize: 12.5, flexWrap: "wrap" }}>
+        <span className="lbl" style={{ color: "var(--signal-2)", flex: "0 0 auto" }}>▸ start here</span>
+        <span style={{ color: "var(--paper)" }}>
+          {!account ? "connect a wallet to patch into a course." : !sel ? "pick a preset above, or open a new course." : isTutor ? "this is your course — confirm each student's lesson on their fader; share the link to fill channels." : mine ? "your bond is locked — money returns to you as the tutor confirms each lesson." : ended ? "this course has closed." : "lock a $1–5 bond on the left; every confirmed lesson returns a slice."}
+        </span>
+        <div style={{ flex: 1 }} />
+        {!account ? <button onClick={connect} disabled={connecting} className="btn btn--signal btn--sm">{connecting ? "…" : "connect wallet"}</button>
+          : (!isTutor && sel && !mine && !ended) ? <button onClick={() => doStake(sel.id)} disabled={!!busy} className="btn btn--signal btn--sm">{busy === "stake" ? "locking…" : `lock $${chip} bond`}</button>
+          : (isTutor && sel) ? <button onClick={() => { const u = typeof window !== "undefined" ? window.location.href : ""; navigator.clipboard?.writeText(u).then(() => flash("✓ course link copied — send it to students")).catch(() => flash("✗ copy failed")); }} className="btn btn--ghost btn--sm">copy invite link</button>
+          : null}
+      </div>
 
       <div className="cols">
         {/* ── COLUMN 1 — stakes / faders ── */}
@@ -175,7 +191,7 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <div style={{ color: "var(--mute)", fontSize: 13, padding: "10px 2px" }}>{sel ? "no bonds locked yet — be the first fader." : "select or create a course."}</div>
+              <div style={{ color: "var(--mute)", fontSize: 13, padding: "10px 2px", lineHeight: 1.6 }}>{!sel ? "select a preset above, or hit + new course." : isTutor ? "no students yet — copy the invite link below and students appear here as faders the moment they lock a bond." : "no bonds locked yet — lock the first one below ↓"}</div>
             )}
 
             {/* student action bar */}
@@ -194,6 +210,15 @@ export default function Home() {
                 {mine && wd === 0n && myDividend === 0n && <div className="mono" style={{ fontSize: 11, color: "var(--mute)", marginTop: 8 }}>bond locked · {mine.attended}/{sel.lessons} confirmed{ended ? " · settled" : ""}</div>}
               </div>
             )}
+
+            {/* tutor action bar */}
+            {sel && isTutor && (
+              <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+                <div className="lbl" style={{ marginBottom: 8 }}>you&apos;re the tutor · {sel.enrolled} enrolled</div>
+                <button className="btn btn--rail btn--block" onClick={() => { const u = typeof window !== "undefined" ? window.location.href : ""; navigator.clipboard?.writeText(u).then(() => flash("✓ course link copied — send it to students")).catch(() => flash("✗ copy failed")); }}>copy invite link</button>
+                <div className="mono" style={{ fontSize: 11, color: "var(--mute)", marginTop: 8, lineHeight: 1.5 }}>students appear as faders when they lock a bond. press <b style={{ color: "var(--refund)" }}>confirm +1</b> on each after a lesson. you can&apos;t stake your own course.</div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -210,7 +235,7 @@ export default function Home() {
                   <Knob label="lessons" value={String(sel.lessons)} rot={Math.min(270, sel.lessons * 4)} />
                   <Knob label="enrolled" value={String(sel.enrolled)} rot={Math.min(270, sel.enrolled * 18)} />
                   <Knob label="staked" value={`$${fmtUsdc(sel.stakers.reduce((a, s) => a + s.stake, 0n))}`} rot={120} />
-                  <Knob label={ended ? "ended" : "time left"} value={ended ? "00" : timeLeft(sel.deadline)} rot={ended ? 270 : 90} />
+                  <Knob label={ended ? "ended" : "time left"} value={ended ? "00" : timeLeft(sel.deadline, now)} rot={ended ? 270 : 90} />
                 </div>
                 <div style={{ display: "flex", justifyContent: "center", marginTop: 22 }}>
                   <div style={{ textAlign: "center" }}>
@@ -280,7 +305,7 @@ export default function Home() {
               <button className="icon-btn" onClick={() => setCreateOpen(false)}>✕</button>
             </div>
             <div className="lbl" style={{ marginBottom: 7 }}>course title</div>
-            <input value={cTitle} onChange={(e) => setCTitle(e.target.value)} maxLength={80} className="input" placeholder="German A1 — evening cohort" />
+            <input value={cTitle} onChange={(e) => setCTitle(e.target.value)} maxLength={80} className="input" placeholder="Mixing & Mastering — 12-session intensive" />
             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
               <div style={{ flex: 1 }}>
                 <div className="lbl" style={{ marginBottom: 7 }}>lessons (N)</div>

@@ -22,7 +22,7 @@ export default function StakeFader({
   busy: boolean;
   onConfirm: () => void;
 }) {
-  const refundedPct = Math.round((stake.attended / lessons) * 100);
+  const refundedPct = stake.attended >= lessons ? 100 : Math.floor((stake.attended / lessons) * 100);
   const upperCls = ended ? "fader__burn" : "fader__locked";
   const back = refundedSoFar(stake);
   const burned = BigInt(lessons - stake.attended) * stake.slice;

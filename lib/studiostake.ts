@@ -147,7 +147,8 @@ export function fmtUsdc(wei: bigint, dp = 2): string {
   return s.includes(".") ? s.replace(/0+$/, "").replace(/\.$/, "") : s;
 }
 
-export function courseEnded(c: Course): boolean { return Math.floor(Date.now() / 1000) >= c.deadline; }
+/** now = client-seeded unix seconds; 0 (SSR / first render) is treated as "not ended" to avoid hydration drift. */
+export function courseEnded(c: Course, now: number): boolean { return now > 0 && now >= c.deadline; }
 export function fullySettled(c: Course): boolean { return c.enrolled > 0 && c.settledCount === c.enrolled; }
 
 /** Per-stake derived money state. */
@@ -155,8 +156,9 @@ export function refundedSoFar(s: Stake): bigint { return BigInt(s.attended) * s.
 export function burnedSoFar(s: Stake, lessons: number): bigint { return BigInt(lessons - s.attended) * s.slice; }
 export function withdrawableNow(s: Stake): bigint { return BigInt(s.attended - s.released) * s.slice; }
 
-export function timeLeft(deadline: number): string {
-  let diff = deadline - Math.floor(Date.now() / 1000);
+export function timeLeft(deadline: number, now: number): string {
+  if (now <= 0) return "…";
+  let diff = deadline - now;
   if (diff <= 0) return "ended";
   const d = Math.floor(diff / 86400); diff -= d * 86400;
   const h = Math.floor(diff / 3600); diff -= h * 3600;
