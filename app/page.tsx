@@ -191,7 +191,24 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <div style={{ color: "var(--mute)", fontSize: 13, padding: "10px 2px", lineHeight: 1.6 }}>{!sel ? "select a preset above, or hit + new course." : isTutor ? "no students yet — copy the invite link below and students appear here as faders the moment they lock a bond." : "no bonds locked yet — lock the first one below ↓"}</div>
+              <div>
+                <div style={{ color: "var(--mute)", fontSize: 13, padding: "2px 2px 14px", lineHeight: 1.6 }}>{!sel ? "select a preset above, or hit + new course." : isTutor ? "no students yet. a student channel looks like this — you press confirm +1 on it after each lesson:" : "no bonds locked yet — lock the first one below ↓"}</div>
+                {sel && isTutor && (
+                  <div style={{ maxWidth: 96 }}>
+                    <div className="fader" style={{ opacity: 0.55, pointerEvents: "none" }}>
+                      <div className="fader__val mono">3/{sel.lessons}</div>
+                      <div className="fader__track" style={{ height: 150 }}>
+                        <div className="fader__locked" style={{ top: 0, bottom: "25%" }} />
+                        <div className="fader__fill" style={{ height: "25%" }} />
+                        <div className="fader__cap" style={{ bottom: "calc(25% - 5px)" }} />
+                      </div>
+                      <div className="fader__sub mono" style={{ opacity: 0.7 }}>sample</div>
+                      <button className="btn btn--refund btn--sm" style={{ width: "100%" }}>confirm +1 ▸</button>
+                    </div>
+                    <div className="mono" style={{ fontSize: 10.5, color: "var(--mute)", marginTop: 6 }}>↑ a real one appears when a student stakes</div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* student action bar */}
