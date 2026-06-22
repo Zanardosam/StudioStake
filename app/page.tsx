@@ -137,9 +137,9 @@ export default function Home() {
           {picker && (<>
             <div onClick={() => setPicker(false)} style={{ position: "fixed", inset: 0, zIndex: 79 }} />
             <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 81, minWidth: 240, maxWidth: "calc(100vw - 36px)", background: "var(--panel)", border: "1px solid var(--line-2)", marginTop: 4, maxHeight: 320, overflow: "auto" }}>
-              {feed.length === 0 && <span className="menu-item" style={{ color: "var(--mute)" }}>no courses yet</span>}
+              {feed.length === 0 && <span className="patch-line" style={{ color: "var(--mute)" }}>no courses yet</span>}
               {feed.map((c) => (
-                <button key={c.id} className="menu-item" onClick={() => { setSel(c); setPicker(false); }}>{c.id < 10 ? "0" + c.id : c.id} · {c.title}</button>
+                <button key={c.id} className="patch-line" onClick={() => { setSel(c); setPicker(false); }}>{c.id < 10 ? "0" + c.id : c.id} · {c.title}</button>
               ))}
             </div>
           </>)}
@@ -152,9 +152,9 @@ export default function Home() {
               <div onClick={() => setWalletOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 60 }} />
               <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 61, minWidth: 220, background: "var(--panel)", border: "1px solid var(--line-2)", marginTop: 4 }}>
                 <div style={{ padding: "12px 14px" }}><div className="lbl">wallet</div><div className="mono" style={{ fontSize: 13, marginTop: 5 }}>{shortAddr(account, 8, 6)}</div><div className="mono" style={{ fontSize: 12, color: "#19e59b", marginTop: 5 }}>{balance || "0"} USDC</div></div>
-                {!chainOk && <button className="menu-item" style={{ color: "#ff3b2e" }} onClick={() => switchToArc().catch(() => {})}>switch to ARC</button>}
-                <a className="menu-item" href={`${ARCSCAN}/address/${account}`} target="_blank" rel="noopener noreferrer">arcscan ↗</a>
-                <button className="menu-item" onClick={() => { setWalletOpen(false); disconnect(); }}>disconnect</button>
+                {!chainOk && <button className="patch-line" style={{ color: "#ff3b2e" }} onClick={() => switchToArc().catch(() => {})}>switch to ARC</button>}
+                <a className="patch-line" href={`${ARCSCAN}/address/${account}`} target="_blank" rel="noopener noreferrer">arcscan ↗</a>
+                <button className="patch-line" onClick={() => { setWalletOpen(false); disconnect(); }}>disconnect</button>
               </div>
             </>)}
           </div>
@@ -316,7 +316,7 @@ export default function Home() {
       {/* create-course modal */}
       {createOpen && (
         <div className="scrim" onClick={() => setCreateOpen(false)}>
-          <div className="modal rise" onClick={(e) => e.stopPropagation()}>
+          <div className="modal fader-in" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
               <h2 className="title" style={{ fontSize: 30 }}>new course</h2>
               <button className="icon-btn" onClick={() => setCreateOpen(false)}>✕</button>
@@ -344,7 +344,7 @@ export default function Home() {
         </div>
       )}
 
-      {toast && <div className="toast mono rise" style={{ color: toast.startsWith("✓") ? "#19e59b" : toast.startsWith("✗") ? "#ff3b2e" : "var(--paper)" }}>{toast}</div>}
+      {toast && <div className="toast mono fader-in" style={{ color: toast.startsWith("✓") ? "#19e59b" : toast.startsWith("✗") ? "#ff3b2e" : "var(--paper)" }}>{toast}</div>}
     </div>
   );
 }
